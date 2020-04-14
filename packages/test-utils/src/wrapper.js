@@ -1,10 +1,7 @@
 // @flow
-
-import Vue from 'vue'
 import pretty from 'pretty'
 import getSelector from './get-selector'
 import { REF_SELECTOR, FUNCTIONAL_OPTIONS, VUE_VERSION } from 'shared/consts'
-import config from './config'
 import WrapperArray from './wrapper-array'
 import ErrorWrapper from './error-wrapper'
 import { throwError, getCheckedEvent, isPhantomJS } from 'shared/util'
@@ -560,10 +557,6 @@ export default class Wrapper implements BaseWrapper {
       throwError(`wrapper.setProps() can only be called on a Vue instance`)
     }
 
-    // Save the original "silent" config so that we can directly mutate props
-    const originalConfig = Vue.config.silent
-    Vue.config.silent = config.silent
-
     try {
       Object.keys(data).forEach(key => {
         // Don't let people set entire objects, because reactivity won't work
@@ -581,25 +574,19 @@ export default class Wrapper implements BaseWrapper {
         }
 
         if (
-          !this.vm ||
-          !this.vm.$options._propKeys ||
-          !this.vm.$options._propKeys.some(prop => prop === key)
-        ) {
-          if (VUE_VERSION > 2.3) {
-            // $FlowIgnore : Problem with possibly null this.vm
-            this.vm.$attrs[key] = data[key]
-            return
-          }
+          VUE_VERSION <= 2.3 &&
+          // $FlowIgnore : Problem with possibly null this.vm
+          (!this.vm.$options._propKeys ||
+            !this.vm.$options._propKeys.some(prop => prop === key))
+        )
           throwError(
             `wrapper.setProps() called with ${key} property which ` +
               `is not defined on the component`
           )
         }
-
-        // Actually set the prop
-        // $FlowIgnore : Problem with possibly null this.vm
-        this.vm[key] = data[key]
-      })
+      if (this.vm && this.vm.$parent) {
+        this.vm.$parent.vueTestUtils_childProps[key] = data[key]
+      }
 
       // $FlowIgnore : Problem with possibly null this.vm
       this.vm.$forceUpdate()
